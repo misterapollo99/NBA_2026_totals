@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "ms-python.python",
+    "charliermarsh.ruff",
+    "mechatroner.rainbow-csv",
+    "qwtel.sqlite-viewer",
+    "eamodio.gitlens"
+  ]
+}
