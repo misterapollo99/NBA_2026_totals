@@ -172,3 +172,17 @@ def test_product_with_all_colors_removed(tmp_path, monkeypatch):
 
 def test_zero_percent_leaves_price_unchanged():
     assert uc.adjust_price("12.99", "0%") == "12.99"
+
+
+def test_negative_result_raises():
+    with pytest.raises(ValueError, match="-150%.*negative"):
+        uc.adjust_price("19", "-150%")
+
+
+def test_minus_100_percent_gives_zero_price():
+    assert uc.adjust_price("19", "-100%") == "0.00"
+
+
+def test_negative_result_names_the_sku(tmp_path, monkeypatch):
+    with pytest.raises(ValueError, match="id B001: price_adjust '-150%'"):
+        run_main(tmp_path, monkeypatch, "B001,Tee,19,red,desc\n", "B001\t\t\t-150%\n")

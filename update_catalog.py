@@ -16,7 +16,8 @@ Assumptions:
    only "crimson", not "red", even though both map to Red.
 6. A token missing from color_map.json falls back to title case and is reported on stderr.
 7. price_adjust is a percentage such as "10%", "+10%" or "-5%". Blank means no change.
-   An unparseable value is an error naming the SKU rather than a silent pass-through.
+   An unparseable value, or one that would make the price negative, is an error naming the
+   SKU rather than a silent pass-through or clamp. -100% (a price of 0.00) is allowed.
 8. Prices use Decimal with ROUND_HALF_UP and are always written with two decimals
    (19 becomes 19.00). A blank catalog price stays blank.
 9. updated_catalog.csv keeps the original columns in order: price is replaced in place and
@@ -70,7 +71,10 @@ def adjust_price(price: str, adjust: str) -> str:
         sign, percent = match.groups()
         factor = Decimal(percent) / 100 * (-1 if sign == "-" else 1)
         amount *= 1 + factor
-    return str(amount.quantize(CENTS, rounding=ROUND_HALF_UP))
+    result = amount.quantize(CENTS, rounding=ROUND_HALF_UP)
+    if result < 0:
+        raise ValueError(f"price_adjust {adjust!r} makes price {result} negative")
+    return str(result)
 
 
 def build_product_detail(colors: list[str]) -> str:
