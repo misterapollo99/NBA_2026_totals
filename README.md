@@ -13,7 +13,9 @@
 | `sql/build_report.py` | Reloads the db, runs both .sql files, writes `sql/sql_solutions.md` and `sql/results/*.csv` |
 | `sql/sql_solutions.md` | Submitted answers: queries, results, notes, validation, flags |
 
-## How to run (PowerShell, from a fresh clone)
+## How to run (from a fresh clone)
+
+Windows (PowerShell):
 
 ```powershell
 python -m venv .venv
@@ -21,6 +23,16 @@ python -m venv .venv
 .\.venv\Scripts\python update_catalog.py
 .\.venv\Scripts\python sql\build_report.py
 .\.venv\Scripts\python -m pytest -q
+```
+
+macOS / Linux:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.lock.txt
+.venv/bin/python update_catalog.py
+.venv/bin/python sql/build_report.py
+.venv/bin/python -m pytest -q
 ```
 
 Run everything from the repo root. `build_report.py` runs the loader first, so there is no separate load step.
