@@ -35,32 +35,36 @@ Result (1 row). Full result: [results/q01.csv](results/q01.csv)
 
 ## Q2. List the names and teams of all players who scored more than 1,000 total points.
 
-**Logic.** Season totals from player_season. For traded players, team is the combined code (2TM, 3TM, ...) and teams lists the clubs they played for, in alphabetical order, from their per-team rows. teams is blank for single-team players. The inner query sorts the per-team rows so GROUP_CONCAT joins them in that order.
+**Logic.** Season totals from player_season. For traded players, team is the combined code (2TM, 3TM, ...) and teams lists the clubs they played for, in alphabetical order, from their per-team rows. teams is blank for single-team players. GROUP_CONCAT runs as a window function because plain GROUP_CONCAT has no guaranteed order before SQLite 3.44, while a window's ORDER BY fixes the order on any version with window functions (3.25+).
 
 ```sql
 WITH stints AS (
     SELECT
-        t.player_id,
-        GROUP_CONCAT(t.team, ', ') AS teams
-    FROM (
-        SELECT
-            player_id,
-            team
-        FROM player_stats
-        WHERE team NOT GLOB '[0-9]*TM'
-        ORDER BY player_id, team
-    ) AS t
-    GROUP BY t.player_id
-    HAVING COUNT(*) > 1
+        player_id,
+        GROUP_CONCAT(team, ', ') OVER (
+            PARTITION BY player_id
+            ORDER BY team
+            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+        ) AS teams,
+        COUNT(*) OVER (PARTITION BY player_id) AS team_count
+    FROM player_stats
+    WHERE team NOT GLOB '[0-9]*TM'
+),
+traded AS (
+    SELECT DISTINCT
+        player_id,
+        teams
+    FROM stints
+    WHERE team_count > 1
 )
 SELECT
     p.player,
     p.team,
-    s.teams,
+    t.teams,
     p.pts
 FROM player_season AS p
-LEFT JOIN stints AS s
-    ON s.player_id = p.player_id
+LEFT JOIN traded AS t
+    ON t.player_id = p.player_id
 WHERE p.pts > 1000
 ORDER BY p.pts DESC, p.player;
 ```

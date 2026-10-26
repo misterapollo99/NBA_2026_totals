@@ -15,9 +15,10 @@ Assumptions:
 5. Removals match the raw synonym token before canonicalization. Removing "crimson" drops
    only "crimson", not "red", even though both map to Red.
 6. A token missing from color_map.json falls back to title case and is reported on stderr.
-7. price_adjust is a percentage such as "10%", "+10%" or "-5%". Blank means no change.
-   An unparseable value, or one that would make the price negative, is an error naming the
-   SKU rather than a silent pass-through or clamp. -100% (a price of 0.00) is allowed.
+7. price_adjust is a percentage such as "10%", "+10%" or "-5%"; the % sign is required.
+   Blank means no change. An unparseable value, or one that would make the price negative,
+   is an error naming the SKU rather than a silent pass-through or clamp. -100% (a price of
+   0.00) is allowed. A catalog price that is not a non-negative number is also an error.
 8. Prices use Decimal with ROUND_HALF_UP and are always written with two decimals
    (19 becomes 19.00). A blank catalog price stays blank.
 9. updated_catalog.csv keeps the original columns in order: price is replaced in place and
@@ -30,7 +31,7 @@ Assumptions:
 import json
 import re
 import sys
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 
 import pandas as pd
@@ -39,7 +40,8 @@ DATA = Path("data")
 OUTPUT = Path("output")
 PREFIX = "Lily Attributes:Color:"
 CENTS = Decimal("0.01")
-ADJUST_PATTERN = re.compile(r"^([+-]?)\s*(\d+(?:\.\d+)?)\s*%?$")
+# The % is required: a bare "5" could mean $5 or 5%, so it is rejected as ambiguous.
+ADJUST_PATTERN = re.compile(r"^([+-]?)\s*(\d+(?:\.\d+)?)\s*%$")
 
 
 def parse_colors(text: str) -> list[str]:
@@ -63,7 +65,13 @@ def adjust_price(price: str, adjust: str) -> str:
     price, adjust = price.strip(), adjust.strip()
     if not price:
         return ""
-    amount = Decimal(price)
+    try:
+        amount = Decimal(price)
+    except InvalidOperation:
+        raise ValueError(f"unparseable price {price!r}") from None
+    # Checked before adjusting so the error blames the catalog price, not price_adjust.
+    if not amount.is_finite() or amount < 0:
+        raise ValueError(f"invalid catalog price {price!r}")
     if adjust:
         match = ADJUST_PATTERN.match(adjust)
         if not match:

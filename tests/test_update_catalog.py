@@ -23,6 +23,17 @@ def test_blank_adjust_leaves_price_unchanged():
     assert uc.adjust_price("19", "   ") == "19.00"
 
 
+def test_bare_number_adjust_raises():
+    with pytest.raises(ValueError, match="unparseable"):
+        uc.adjust_price("100", "5")
+
+
+@pytest.mark.parametrize("price", ["$19.99", "19,99", "NaN", "-5", "-0.001"])
+def test_bad_catalog_price_raises(price):
+    with pytest.raises(ValueError, match="price"):
+        uc.adjust_price(price, "")
+
+
 def test_malformed_adjust_raises():
     with pytest.raises(ValueError, match="unparseable"):
         uc.adjust_price("10", "ten percent")

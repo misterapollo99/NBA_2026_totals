@@ -155,7 +155,9 @@ def write_database(rows: list[dict], columns: list[str], league: dict) -> None:
             [league[c] for c in PCT_COLUMNS],
         )
 
-        con.executescript(PLAYER_SEASON_VIEW)
+        # execute, not executescript: executescript commits first, so a failing view would
+        # leave the new tables committed without it.
+        con.execute(PLAYER_SEASON_VIEW)
         con.commit()
     finally:
         con.close()

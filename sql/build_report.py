@@ -148,10 +148,14 @@ def dataset_facts(con: sqlite3.Connection) -> dict:
         FROM player_stats
     """
     rows, combined, players, teams = con.execute(query).fetchone()
+    codes = con.execute(
+        "SELECT DISTINCT team FROM player_stats WHERE team GLOB '[0-9]*TM' ORDER BY team"
+    ).fetchall()
     league = con.execute("SELECT fg_pct, fg3_pct, ft_pct FROM league_average").fetchone()
     return {
         "rows": rows,
         "combined": combined,
+        "combined_codes": ", ".join(f"`{code}`" for (code,) in codes),
         "players": players,
         "teams": teams,
         "league": league,
@@ -188,8 +192,8 @@ def header_section(facts: dict) -> list[str]:
         "percentage means zero attempts and is stored as NULL, not 0. The loader fails if any "
         "NULL percentage does not line up with zero attempts.",
         f"- `player_stats` keeps all {facts['rows']} player rows: {facts['players']} players "
-        f"on {facts['teams']} teams, including {facts['combined']} combined rows (team `2TM`, "
-        "`3TM`, `4TM`) for traded players alongside their per-team rows.",
+        f"on {facts['teams']} teams, including {facts['combined']} combined rows (team "
+        f"{facts['combined_codes']}) for traded players alongside their per-team rows.",
         "- View `player_season` has one row per player: the combined row for traded players, "
         "the only row otherwise. Player-level questions (1, 2, 3, 4, 5, 7, 8, 10) use it.",
         "- Team-level questions (6, 9) use `player_stats` without combined rows, so a traded "
