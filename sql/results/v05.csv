@@ -1,0 +1,2 @@
+rows_checked,max_abs_difference,zero_fga_rows,zero_fga_with_null_pct,zero_fga_with_value,attempts_but_null_pct,result
+733,0.0005,3,3,0,0,ok
