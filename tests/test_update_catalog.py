@@ -57,7 +57,7 @@ def test_malformed_adjust_names_the_sku(tmp_path, monkeypatch):
 
 
 def test_duplicate_update_id_raises(tmp_path, monkeypatch):
-    with pytest.raises(pd.errors.MergeError):
+    with pytest.raises(ValueError, match=r"duplicate ids in updates.tsv: \['B001'\]"):
         run_main(tmp_path, monkeypatch, "B001,Tee,19,red,desc\n", "B001\t\t\t10%\nB001\t\t\t5%\n")
 
 

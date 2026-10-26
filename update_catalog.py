@@ -95,7 +95,15 @@ def main() -> None:
     if orphans:
         print(f"note: ignoring updates for ids not in catalog: {orphans}", file=sys.stderr)
 
-    merged = catalog.merge(updates, on="id", how="left", validate="many_to_one")
+    try:
+        merged = catalog.merge(updates, on="id", how="left", validate="many_to_one")
+    except pd.errors.MergeError as err:
+        # Name the offending ids; pandas' own message does not say which rows collide.
+        for name, frame in (("catalog.csv", catalog), ("updates.tsv", updates)):
+            duplicated = sorted(frame.loc[frame["id"].duplicated(), "id"].unique())
+            if duplicated:
+                raise ValueError(f"duplicate ids in {name}: {duplicated}") from err
+        raise
     # Catalog rows without an update come back as NaN after a left join.
     merged = merged.fillna("")
 
