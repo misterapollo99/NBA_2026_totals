@@ -88,6 +88,13 @@ def load_inputs() -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str]]:
     return catalog, updates, color_map
 
 
+def require_unique_ids(frame: pd.DataFrame, name: str) -> None:
+    # pandas' merge validation only checks one side and does not name the ids.
+    duplicated = sorted(frame.loc[frame["id"].duplicated(), "id"].unique())
+    if duplicated:
+        raise ValueError(f"duplicate ids in {name}: {duplicated}")
+
+
 def main() -> None:
     catalog, updates, color_map = load_inputs()
 
@@ -95,15 +102,9 @@ def main() -> None:
     if orphans:
         print(f"note: ignoring updates for ids not in catalog: {orphans}", file=sys.stderr)
 
-    try:
-        merged = catalog.merge(updates, on="id", how="left", validate="many_to_one")
-    except pd.errors.MergeError as err:
-        # Name the offending ids; pandas' own message does not say which rows collide.
-        for name, frame in (("catalog.csv", catalog), ("updates.tsv", updates)):
-            duplicated = sorted(frame.loc[frame["id"].duplicated(), "id"].unique())
-            if duplicated:
-                raise ValueError(f"duplicate ids in {name}: {duplicated}") from err
-        raise
+    require_unique_ids(catalog, "catalog.csv")
+    require_unique_ids(updates, "updates.tsv")
+    merged = catalog.merge(updates, on="id", how="left", validate="one_to_one")
     # Catalog rows without an update come back as NaN after a left join.
     merged = merged.fillna("")
 

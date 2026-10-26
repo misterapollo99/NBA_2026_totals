@@ -61,6 +61,12 @@ def test_duplicate_update_id_raises(tmp_path, monkeypatch):
         run_main(tmp_path, monkeypatch, "B001,Tee,19,red,desc\n", "B001\t\t\t10%\nB001\t\t\t5%\n")
 
 
+def test_duplicate_catalog_id_raises(tmp_path, monkeypatch):
+    catalog_rows = "B001,Tee,19,red,desc\nB001,Tee copy,20,red,desc\n"
+    with pytest.raises(ValueError, match=r"duplicate ids in catalog.csv: \['B001'\]"):
+        run_main(tmp_path, monkeypatch, catalog_rows, "B001\t\t\t10%\n")
+
+
 def test_orphan_update_id_is_ignored(tmp_path, monkeypatch, capsys):
     out = run_main(tmp_path, monkeypatch, "B001,Tee,19,red,desc\n", "B001\t\t\t10%\nZZZ\t\t\t50%\n")
     result = pd.read_csv(out / "updated_catalog.csv", dtype=str, keep_default_na=False)
