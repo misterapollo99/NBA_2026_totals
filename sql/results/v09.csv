@@ -1,2 +1,2 @@
-no_threshold,min_100_fga,min_200_fga,min_300_fga,players_with_300_fga
-241,179,148,120,284
+no_threshold,min_100_fga,min_200_fga,min_300_fga,players_with_300_fga,naive_avg_fg_pct_no_threshold
+241,179,148,120,284,273

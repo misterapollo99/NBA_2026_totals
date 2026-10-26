@@ -157,15 +157,19 @@ GROUP BY pos
 ORDER BY averaged_min_20_g DESC;
 
 -- V9. Q8 sensitivity: players above league FG% by minimum FGA
+-- Note: naive_avg_fg_pct_no_threshold is the common shortcut, stored fg_pct > AVG(fg_pct)
+-- with no threshold, which the Q8 note quotes for contrast.
 WITH league AS (
     SELECT
-        CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct
+        CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct,
+        AVG(fg_pct) AS avg_fg_pct
     FROM player_season
 ),
 shooters AS (
     SELECT
         p.fga,
-        CAST(p.fg AS REAL) / p.fga > l.fg_pct AS above
+        CAST(p.fg AS REAL) / p.fga > l.fg_pct AS above,
+        p.fg_pct > l.avg_fg_pct AS above_naive
     FROM player_season AS p
     CROSS JOIN league AS l
     WHERE p.fga > 0
@@ -175,7 +179,8 @@ SELECT
     SUM(above AND fga >= 100) AS min_100_fga,
     SUM(above AND fga >= 200) AS min_200_fga,
     SUM(above AND fga >= 300) AS min_300_fga,
-    SUM(fga >= 300) AS players_with_300_fga
+    SUM(fga >= 300) AS players_with_300_fga,
+    SUM(above_naive) AS naive_avg_fg_pct_no_threshold
 FROM shooters;
 
 -- V10. Q10 sensitivity: average 3P with and without zero-attempt players

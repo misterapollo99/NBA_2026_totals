@@ -35,16 +35,22 @@ Result (1 row). Full result: [results/q01.csv](results/q01.csv)
 
 ## Q2. List the names and teams of all players who scored more than 1,000 total points.
 
-**Logic.** Season totals from player_season. For traded players, team is the combined code (2TM, 3TM, ...) and teams lists the clubs they played for, in alphabetical order, from their per-team rows. teams is blank for single-team players. GROUP_CONCAT with ORDER BY needs SQLite 3.44 or later.
+**Logic.** Season totals from player_season. For traded players, team is the combined code (2TM, 3TM, ...) and teams lists the clubs they played for, in alphabetical order, from their per-team rows. teams is blank for single-team players. The inner query sorts the per-team rows so GROUP_CONCAT joins them in that order.
 
 ```sql
 WITH stints AS (
     SELECT
-        player_id,
-        GROUP_CONCAT(team, ', ' ORDER BY team) AS teams
-    FROM player_stats
-    WHERE team NOT GLOB '[0-9]*TM'
-    GROUP BY player_id
+        t.player_id,
+        GROUP_CONCAT(t.team, ', ') AS teams
+    FROM (
+        SELECT
+            player_id,
+            team
+        FROM player_stats
+        WHERE team NOT GLOB '[0-9]*TM'
+        ORDER BY player_id, team
+    ) AS t
+    GROUP BY t.player_id
     HAVING COUNT(*) > 1
 )
 SELECT
@@ -212,7 +218,7 @@ Result (5 rows). Full result: [results/q07.csv](results/q07.csv)
 
 ## Q8. List players whose field goal percentage (FG%) is higher than the league average.
 
-**Logic.** League FG% = SUM(fg) / SUM(fga) over all players (0.4710, matching Basketball Reference's .471). AVG(fg_pct) would weight a 2-shot player like a 1,500-shot player and gives 0.4618. Players need at least 300 FGA, about 3.7 per game over 82 games, so tiny samples do not qualify. Comparison uses unrounded fg / fga, not the 3-decimal fg_pct. Without the FGA threshold, 241 players are above the league figure.
+**Logic.** League FG% = SUM(fg) / SUM(fga) over all players (0.4710, matching Basketball Reference's .471). AVG(fg_pct) would weight a 2-shot player like a 1,500-shot player and gives 0.4618. Players need at least 300 FGA, about 3.7 per game over 82 games, so tiny samples do not qualify. Comparison uses unrounded fg / fga, not the 3-decimal fg_pct. Without the FGA threshold, 241 players are above the league figure. The common naive version, fg_pct > AVG(fg_pct) with no threshold, returns 273 (see Validation V9).
 
 ```sql
 WITH league AS (
@@ -605,18 +611,22 @@ Result (5 rows). Full result: [results/v08.csv](results/v08.csv)
 
 ### V9. Q8 sensitivity: players above league FG% by minimum FGA
 
+Naive_avg_fg_pct_no_threshold is the common shortcut, stored fg_pct > AVG(fg_pct) with no threshold, which the Q8 note quotes for contrast.
+
 <details><summary>SQL</summary>
 
 ```sql
 WITH league AS (
     SELECT
-        CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct
+        CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct,
+        AVG(fg_pct) AS avg_fg_pct
     FROM player_season
 ),
 shooters AS (
     SELECT
         p.fga,
-        CAST(p.fg AS REAL) / p.fga > l.fg_pct AS above
+        CAST(p.fg AS REAL) / p.fga > l.fg_pct AS above,
+        p.fg_pct > l.avg_fg_pct AS above_naive
     FROM player_season AS p
     CROSS JOIN league AS l
     WHERE p.fga > 0
@@ -626,7 +636,8 @@ SELECT
     SUM(above AND fga >= 100) AS min_100_fga,
     SUM(above AND fga >= 200) AS min_200_fga,
     SUM(above AND fga >= 300) AS min_300_fga,
-    SUM(fga >= 300) AS players_with_300_fga
+    SUM(fga >= 300) AS players_with_300_fga,
+    SUM(above_naive) AS naive_avg_fg_pct_no_threshold
 FROM shooters;
 ```
 
@@ -634,9 +645,9 @@ FROM shooters;
 
 Result (1 row). Full result: [results/v09.csv](results/v09.csv)
 
-| no_threshold | min_100_fga | min_200_fga | min_300_fga | players_with_300_fga |
-|---|---|---|---|---|
-| 241 | 179 | 148 | 120 | 284 |
+| no_threshold | min_100_fga | min_200_fga | min_300_fga | players_with_300_fga | naive_avg_fg_pct_no_threshold |
+|---|---|---|---|---|---|
+| 241 | 179 | 148 | 120 | 284 | 273 |
 
 ### V10. Q10 sensitivity: average 3P with and without zero-attempt players
 

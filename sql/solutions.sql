@@ -29,15 +29,21 @@ FROM player_season;
 -- Q2. List the names and teams of all players who scored more than 1,000 total points.
 -- Logic: season totals from player_season. For traded players, team is the combined code
 -- (2TM, 3TM, ...) and teams lists the clubs they played for, in alphabetical order, from
--- their per-team rows. teams is blank for single-team players. GROUP_CONCAT with ORDER BY
--- needs SQLite 3.44 or later.
+-- their per-team rows. teams is blank for single-team players. The inner query sorts the
+-- per-team rows so GROUP_CONCAT joins them in that order.
 WITH stints AS (
     SELECT
-        player_id,
-        GROUP_CONCAT(team, ', ' ORDER BY team) AS teams
-    FROM player_stats
-    WHERE team NOT GLOB '[0-9]*TM'
-    GROUP BY player_id
+        t.player_id,
+        GROUP_CONCAT(t.team, ', ') AS teams
+    FROM (
+        SELECT
+            player_id,
+            team
+        FROM player_stats
+        WHERE team NOT GLOB '[0-9]*TM'
+        ORDER BY player_id, team
+    ) AS t
+    GROUP BY t.player_id
     HAVING COUNT(*) > 1
 )
 SELECT
@@ -124,7 +130,8 @@ ORDER BY avg_ppg DESC;
 -- Reference's .471). AVG(fg_pct) would weight a 2-shot player like a 1,500-shot player and
 -- gives 0.4618. Players need at least 300 FGA, about 3.7 per game over 82 games, so tiny
 -- samples do not qualify. Comparison uses unrounded fg / fga, not the 3-decimal fg_pct.
--- Without the FGA threshold, 241 players are above the league figure.
+-- Without the FGA threshold, 241 players are above the league figure. The common naive
+-- version, fg_pct > AVG(fg_pct) with no threshold, returns 273 (see Validation V9).
 WITH league AS (
     SELECT
         CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct
