@@ -41,7 +41,7 @@ Run everything from the repo root. `build_report.py` runs the loader first, so t
 
 Python 3.12.10, SQLite 3.49.1 (bundled with Python's `sqlite3`), pandas 3.1.0, pytest 9.1.1, ruff 0.17.2. Exact pins are in `requirements.lock.txt`.
 
-`sql/solutions.sql` runs on its own against any `player_stats` table on SQLite 3.25 or later (the first release with window functions, which Q6 and Q9 need). `sql/validation.sql` and the report build use `GROUP_CONCAT(... ORDER BY ...)`, so they need SQLite 3.44 or later. Check yours with `.\.venv\Scripts\python -c "import sqlite3; print(sqlite3.sqlite_version)"`.
+`sql/solutions.sql` runs on its own against any `player_stats` table on SQLite 3.25 or later (the first release with window functions, which Q6 and Q9 need). `sql/validation.sql` and the report build use `GROUP_CONCAT(... ORDER BY ...)`, so they need SQLite 3.44 or later. Check yours with `.\.venv\Scripts\python -c "import sqlite3; print(sqlite3.sqlite_version)"` (Windows) or `.venv/bin/python -c "import sqlite3; print(sqlite3.sqlite_version)"` (macOS / Linux).
 
 ## Assumptions and decisions
 
