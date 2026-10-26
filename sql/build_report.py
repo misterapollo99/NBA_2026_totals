@@ -18,6 +18,7 @@ Assumptions:
 6. A validation row whose "result" column is not "ok" is listed under Flags. Nothing is
    adjusted to make a check pass.
 7. The doc has no timestamps, so rerunning on the same data gives an identical file.
+8. Paths are resolved relative to this file, so the report builds from any directory.
 """
 
 import csv
@@ -29,7 +30,7 @@ from pathlib import Path
 
 import load_nba
 
-SQL_DIR = Path("sql")
+SQL_DIR = Path(__file__).resolve().parent
 SOLUTIONS = SQL_DIR / "solutions.sql"
 VALIDATION = SQL_DIR / "validation.sql"
 REPORT = SQL_DIR / "sql_solutions.md"

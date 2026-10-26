@@ -20,6 +20,8 @@ Assumptions:
 6. Traded players have one combined row (team 2TM, 3TM, ...) plus one row per team. All rows
    are kept in player_stats; the player_season view picks one row per player.
 7. The table and view are dropped and recreated on every run, so the load is repeatable.
+8. data/ and sql/ are resolved relative to the repo root (this file's parent folder), so the
+   loader runs from any directory.
 """
 
 import re
@@ -29,8 +31,9 @@ from pathlib import Path
 
 import pandas as pd
 
-CSV_PATH = Path("data/nba_2025_26_totals.csv")
-DB_PATH = Path("sql/nba.db")
+ROOT = Path(__file__).resolve().parent.parent
+CSV_PATH = ROOT / "data" / "nba_2025_26_totals.csv"
+DB_PATH = ROOT / "sql" / "nba.db"
 LEAGUE_AVERAGE_ID = "-9999"
 
 TEXT_COLUMNS = ["player", "team", "pos", "awards", "player_id"]

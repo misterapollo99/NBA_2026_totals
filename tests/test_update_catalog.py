@@ -1,4 +1,7 @@
 import json
+import shutil
+import subprocess
+import sys
 
 import pandas as pd
 import pytest
@@ -108,15 +111,39 @@ def test_leading_zero_id_survives_outputs(tmp_path, monkeypatch):
     ]
 
 
-def test_non_price_columns_identical_to_input(tmp_path, monkeypatch):
+def test_pass_through_columns_identical_to_input(tmp_path, monkeypatch):
     out = run_on_real_data(tmp_path / "output", monkeypatch)
     original = read_text_csv(uc.DATA / "catalog.csv")
     result = read_text_csv(out / "updated_catalog.csv")
     assert list(result.columns) == [*original.columns, "product_detail"]
-    untouched = [c for c in original.columns if c != "price"]
+    untouched = [c for c in original.columns if c not in ("price", "color_list")]
     pd.testing.assert_frame_equal(result[untouched], original[untouched])
     # The real data has a description with a quoted comma; make sure it was exercised.
     assert any("," in d for d in original["description"])
+
+
+def test_color_list_matches_product_detail(tmp_path, monkeypatch):
+    out = run_on_real_data(tmp_path / "output", monkeypatch)
+    updated = read_text_csv(out / "updated_catalog.csv")
+    for row in updated.itertuples(index=False):
+        detail_colors = [p.removeprefix(uc.PREFIX) for p in row.product_detail.split(",") if p]
+        assert row.color_list == ", ".join(detail_colors), row.id
+    assert updated.set_index("id").loc["123", "color_list"] == "Black, Gray"
+
+
+def test_runs_from_another_directory(tmp_path, monkeypatch):
+    # A copy of the script and inputs, so the subprocess never writes to the real output/.
+    repo, elsewhere = tmp_path / "repo", tmp_path / "elsewhere"
+    shutil.copytree(uc.DATA, repo / "data")
+    shutil.copy(uc.ROOT / "update_catalog.py", repo)
+    elsewhere.mkdir()
+    subprocess.run([sys.executable, str(repo / "update_catalog.py")], cwd=elsewhere, check=True)
+    assert not any(elsewhere.iterdir())
+
+    expected = run_on_real_data(tmp_path / "expected", monkeypatch)
+    names = ("updated_catalog.csv", "product_detail_only.csv", "colors_summary.csv")
+    for name in names:
+        assert (repo / "output" / name).read_bytes() == (expected / name).read_bytes(), name
 
 
 def test_real_data_reconciles(tmp_path, monkeypatch):
@@ -175,6 +202,7 @@ def test_product_with_all_colors_removed(tmp_path, monkeypatch):
     )
     updated = read_text_csv(out / "updated_catalog.csv").set_index("id")
     assert updated.loc["A1", "product_detail"] == ""
+    assert updated.loc["A1", "color_list"] == ""
     assert read_text_csv(out / "product_detail_only.csv").set_index("id").loc["A1"].item() == ""
     assert read_text_csv(out / "colors_summary.csv").to_dict("records") == [
         {"color": "Blue", "count": "1"}

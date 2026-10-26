@@ -64,18 +64,43 @@ ORDER BY p.pts DESC, p.player;
 
 -- Q3. Who are the top 5 players by total assists?
 -- Logic: season totals from player_season, highest first. Player name breaks ties so the
--- order is stable; the validation section confirms no tie at the 5th place cutoff.
+-- order is stable; the validation section confirms no tie at the 5th place cutoff. As in Q2,
+-- team is the combined code (2TM, 3TM, ...) for traded players and teams lists the clubs
+-- they played for, in alphabetical order; teams is blank for single-team players.
+WITH stints AS (
+    SELECT
+        player_id,
+        GROUP_CONCAT(team, ', ') OVER (
+            PARTITION BY player_id
+            ORDER BY team
+            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+        ) AS teams,
+        COUNT(*) OVER (PARTITION BY player_id) AS team_count
+    FROM player_stats
+    WHERE team NOT GLOB '[0-9]*TM'
+),
+traded AS (
+    SELECT DISTINCT
+        player_id,
+        teams
+    FROM stints
+    WHERE team_count > 1
+)
 SELECT
-    player,
-    team,
-    ast
-FROM player_season
-ORDER BY ast DESC, player
+    p.player,
+    p.team,
+    t.teams,
+    p.ast
+FROM player_season AS p
+LEFT JOIN traded AS t
+    ON t.player_id = p.player_id
+ORDER BY p.ast DESC, p.player
 LIMIT 5;
 
 -- Q4. What is the average number of rebounds per player?
--- Logic: AVG(trb) over player_season, so each player counts once with season total
--- rebounds. SQLite's AVG returns REAL, so there is no integer division.
+-- Logic: this is total rebounds per player over the season, not rebounds per game.
+-- AVG(trb) over player_season, so each player counts once with season total rebounds.
+-- SQLite's AVG returns REAL, so there is no integer division.
 SELECT
     ROUND(AVG(trb), 2) AS avg_rebounds
 FROM player_season;
@@ -136,7 +161,11 @@ ORDER BY avg_ppg DESC;
 -- gives 0.4618. Players need at least 300 FGA, about 3.7 per game over 82 games, so tiny
 -- samples do not qualify. Comparison uses unrounded fg / fga, not the 3-decimal fg_pct.
 -- Without the FGA threshold, 241 players are above the league figure. The common naive
--- version, fg_pct > AVG(fg_pct) with no threshold, returns 273 (see Validation V9).
+-- version, stored fg_pct > AVG(fg_pct) with no threshold, returns 273; the same comparison
+-- on fg / fga returns 270. The three extra players have fg / fga of 0.4615 to four decimals
+-- (6/13 and 12/26), which the stored column rounds up to 0.462, so they pass the comparison
+-- with the 0.4618 average incorrectly (see Validation V9). fg_pct and league_fg_pct are
+-- shown to 4 decimals with printf, which returns text so trailing zeros are kept.
 WITH league AS (
     SELECT
         CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct
@@ -147,8 +176,8 @@ SELECT
     p.team,
     p.fg,
     p.fga,
-    ROUND(CAST(p.fg AS REAL) / p.fga, 3) AS fg_pct,
-    ROUND(l.fg_pct, 4) AS league_fg_pct
+    printf('%.4f', CAST(p.fg AS REAL) / p.fga) AS fg_pct,
+    printf('%.4f', l.fg_pct) AS league_fg_pct
 FROM player_season AS p
 CROSS JOIN league AS l
 WHERE p.fga >= 300

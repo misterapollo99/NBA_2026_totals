@@ -35,7 +35,7 @@ python3 -m venv .venv
 .venv/bin/python -m pytest -q
 ```
 
-Run everything from the repo root. `build_report.py` runs the loader first, so there is no separate load step.
+The scripts resolve `data/`, `output/`, and `sql/` relative to the repo, so they run from any directory. `build_report.py` runs the loader first, so there is no separate load step.
 
 ## Versions
 
@@ -49,7 +49,7 @@ Python 3.12.10, SQLite 3.49.1 (bundled with Python's `sqlite3`), pandas 3.1.0, p
 - All fields are read as text, so ids like `0042` stay as they are. Updates are left-joined by id; duplicate ids in either file are an error.
 - Color tokens are split on commas, trimmed, and lowercased. Additions are applied before removals, and removals match the raw token before it is mapped to a canonical color. Unmapped tokens fall back to title case and are reported.
 - `price_adjust` must be a percentage with `%`. Prices use Decimal with half-up rounding and two decimals. An unparseable or negative result is an error naming the SKU.
-- `color_list` keeps the original input; normalized colors are in `product_detail`.
+- `color_list` is replaced with the final canonical colors; `price` is replaced in place and `product_detail` is appended. The original input is in `data/catalog.csv`.
 
 **Part 2** (details and numbers are in `sql/sql_solutions.md`)
 - `player_id` (Basketball Reference's Player-additional) is the player key. The League Average row is moved to table `league_average` and used only to reconcile results.

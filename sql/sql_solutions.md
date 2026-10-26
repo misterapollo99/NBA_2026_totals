@@ -91,31 +91,53 @@ Result (81 rows, first 15 shown). Full result: [results/q02.csv](results/q02.csv
 
 ## Q3. Who are the top 5 players by total assists?
 
-**Logic.** Season totals from player_season, highest first. Player name breaks ties so the order is stable; the validation section confirms no tie at the 5th place cutoff.
+**Logic.** Season totals from player_season, highest first. Player name breaks ties so the order is stable; the validation section confirms no tie at the 5th place cutoff. As in Q2, team is the combined code (2TM, 3TM, ...) for traded players and teams lists the clubs they played for, in alphabetical order; teams is blank for single-team players.
 
 ```sql
+WITH stints AS (
+    SELECT
+        player_id,
+        GROUP_CONCAT(team, ', ') OVER (
+            PARTITION BY player_id
+            ORDER BY team
+            ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+        ) AS teams,
+        COUNT(*) OVER (PARTITION BY player_id) AS team_count
+    FROM player_stats
+    WHERE team NOT GLOB '[0-9]*TM'
+),
+traded AS (
+    SELECT DISTINCT
+        player_id,
+        teams
+    FROM stints
+    WHERE team_count > 1
+)
 SELECT
-    player,
-    team,
-    ast
-FROM player_season
-ORDER BY ast DESC, player
+    p.player,
+    p.team,
+    t.teams,
+    p.ast
+FROM player_season AS p
+LEFT JOIN traded AS t
+    ON t.player_id = p.player_id
+ORDER BY p.ast DESC, p.player
 LIMIT 5;
 ```
 
 Result (5 rows). Full result: [results/q03.csv](results/q03.csv)
 
-| player | team | ast |
-|---|---|---|
-| Nikola Jokić | DEN | 697 |
-| Cade Cunningham | DET | 634 |
-| Jalen Johnson | ATL | 566 |
-| James Harden | 2TM | 557 |
-| Jamal Murray | DEN | 535 |
+| player | team | teams | ast |
+|---|---|---|---|
+| Nikola Jokić | DEN |  | 697 |
+| Cade Cunningham | DET |  | 634 |
+| Jalen Johnson | ATL |  | 566 |
+| James Harden | 2TM | CLE, LAC | 557 |
+| Jamal Murray | DEN |  | 535 |
 
 ## Q4. What is the average number of rebounds per player?
 
-**Logic.** AVG(trb) over player_season, so each player counts once with season total rebounds. SQLite's AVG returns REAL, so there is no integer division.
+**Logic.** This is total rebounds per player over the season, not rebounds per game. AVG(trb) over player_season, so each player counts once with season total rebounds. SQLite's AVG returns REAL, so there is no integer division.
 
 ```sql
 SELECT
@@ -222,7 +244,7 @@ Result (5 rows). Full result: [results/q07.csv](results/q07.csv)
 
 ## Q8. List players whose field goal percentage (FG%) is higher than the league average.
 
-**Logic.** League FG% = SUM(fg) / SUM(fga) over all players (0.4710, matching Basketball Reference's .471). AVG(fg_pct) would weight a 2-shot player like a 1,500-shot player and gives 0.4618. Players need at least 300 FGA, about 3.7 per game over 82 games, so tiny samples do not qualify. Comparison uses unrounded fg / fga, not the 3-decimal fg_pct. Without the FGA threshold, 241 players are above the league figure. The common naive version, fg_pct > AVG(fg_pct) with no threshold, returns 273 (see Validation V9).
+**Logic.** League FG% = SUM(fg) / SUM(fga) over all players (0.4710, matching Basketball Reference's .471). AVG(fg_pct) would weight a 2-shot player like a 1,500-shot player and gives 0.4618. Players need at least 300 FGA, about 3.7 per game over 82 games, so tiny samples do not qualify. Comparison uses unrounded fg / fga, not the 3-decimal fg_pct. Without the FGA threshold, 241 players are above the league figure. The common naive version, stored fg_pct > AVG(fg_pct) with no threshold, returns 273; the same comparison on fg / fga returns 270. The three extra players have fg / fga of 0.4615 to four decimals (6/13 and 12/26), which the stored column rounds up to 0.462, so they pass the comparison with the 0.4618 average incorrectly (see Validation V9). fg_pct and league_fg_pct are shown to 4 decimals with printf, which returns text so trailing zeros are kept.
 
 ```sql
 WITH league AS (
@@ -235,8 +257,8 @@ SELECT
     p.team,
     p.fg,
     p.fga,
-    ROUND(CAST(p.fg AS REAL) / p.fga, 3) AS fg_pct,
-    ROUND(l.fg_pct, 4) AS league_fg_pct
+    printf('%.4f', CAST(p.fg AS REAL) / p.fga) AS fg_pct,
+    printf('%.4f', l.fg_pct) AS league_fg_pct
 FROM player_season AS p
 CROSS JOIN league AS l
 WHERE p.fga >= 300
@@ -248,21 +270,21 @@ Result (120 rows, first 15 shown). Full result: [results/q08.csv](results/q08.cs
 
 | player | team | fg | fga | fg_pct | league_fg_pct |
 |---|---|---|---|---|---|
-| Jakob Poeltl | TOR | 217 | 310 | 0.7 | 0.471 |
-| Rudy Gobert | MIN | 335 | 491 | 0.682 | 0.471 |
-| Deandre Ayton | LAL | 403 | 601 | 0.671 | 0.471 |
-| Daniel Gafford | DAL | 207 | 316 | 0.655 | 0.471 |
-| Neemias Queta | BOS | 326 | 499 | 0.653 | 0.471 |
-| Oso Ighodaro | PHO | 239 | 366 | 0.653 | 0.471 |
-| Jalen Duren | DET | 522 | 803 | 0.65 | 0.471 |
-| Mark Williams | PHO | 282 | 438 | 0.644 | 0.471 |
-| Jarrett Allen | CLE | 337 | 528 | 0.638 | 0.471 |
-| Moussa Diabaté | CHO | 229 | 363 | 0.631 | 0.471 |
-| Giannis Antetokounmpo | MIL | 373 | 598 | 0.624 | 0.471 |
-| Marvin Bagley III | 2TM | 254 | 411 | 0.618 | 0.471 |
-| Paul Reed | DET | 209 | 339 | 0.617 | 0.471 |
-| Day'Ron Sharpe | BRK | 214 | 356 | 0.601 | 0.471 |
-| Zion Williamson | NOP | 484 | 807 | 0.6 | 0.471 |
+| Jakob Poeltl | TOR | 217 | 310 | 0.7000 | 0.4710 |
+| Rudy Gobert | MIN | 335 | 491 | 0.6823 | 0.4710 |
+| Deandre Ayton | LAL | 403 | 601 | 0.6705 | 0.4710 |
+| Daniel Gafford | DAL | 207 | 316 | 0.6551 | 0.4710 |
+| Neemias Queta | BOS | 326 | 499 | 0.6533 | 0.4710 |
+| Oso Ighodaro | PHO | 239 | 366 | 0.6530 | 0.4710 |
+| Jalen Duren | DET | 522 | 803 | 0.6501 | 0.4710 |
+| Mark Williams | PHO | 282 | 438 | 0.6438 | 0.4710 |
+| Jarrett Allen | CLE | 337 | 528 | 0.6383 | 0.4710 |
+| Moussa Diabaté | CHO | 229 | 363 | 0.6309 | 0.4710 |
+| Giannis Antetokounmpo | MIL | 373 | 598 | 0.6237 | 0.4710 |
+| Marvin Bagley III | 2TM | 254 | 411 | 0.6180 | 0.4710 |
+| Paul Reed | DET | 209 | 339 | 0.6165 | 0.4710 |
+| Day'Ron Sharpe | BRK | 214 | 356 | 0.6011 | 0.4710 |
+| Zion Williamson | NOP | 484 | 807 | 0.5998 | 0.4710 |
 
 ## Q9. For each team, rank players by points scored (use window functions).
 
@@ -404,25 +426,37 @@ Result (1 row). Full result: [results/v01.csv](results/v01.csv)
 
 ### V2. Multi-team players without a combined row
 
-Player_season would return several rows for such a player. Expect no rows.
+Player_season would return several rows for such a player. One summary row, ok when the count is 0; any such players are listed by name.
 
 <details><summary>SQL</summary>
 
 ```sql
+WITH missing AS (
+    SELECT
+        player_id,
+        player
+    FROM player_stats
+    GROUP BY player_id
+    HAVING COUNT(*) > 1
+        AND SUM(team GLOB '[0-9]*TM') = 0
+)
 SELECT
-    player_id,
-    player,
-    COUNT(*) AS team_rows,
-    'missing combined row' AS result
-FROM player_stats
-GROUP BY player_id
-HAVING COUNT(*) > 1
-    AND SUM(team GLOB '[0-9]*TM') = 0;
+    COUNT(*) AS players_without_combined_row,
+    GROUP_CONCAT(player, ', ' ORDER BY player) AS players,
+    CASE
+        WHEN COUNT(*) = 0 THEN 'ok'
+        ELSE 'missing combined row'
+    END AS result
+FROM missing;
 ```
 
 </details>
 
-Result: 0 rows. Full result: [results/v02.csv](results/v02.csv)
+Result (1 row). Full result: [results/v02.csv](results/v02.csv)
+
+| players_without_combined_row | players | result |
+|---|---|---|
+| 0 |  | ok |
 
 ### V3. League FG%: SUM(fg) / SUM(fga) vs the saved League Average row
 
@@ -615,7 +649,7 @@ Result (5 rows). Full result: [results/v08.csv](results/v08.csv)
 
 ### V9. Q8 sensitivity: players above league FG% by minimum FGA
 
-Naive_avg_fg_pct_no_threshold is the common shortcut, stored fg_pct > AVG(fg_pct) with no threshold, which the Q8 note quotes for contrast.
+The naive columns are the common shortcut, a player's FG% > the average of player FG%s with no threshold, which the Q8 note quotes for contrast. naive_stored_fg_pct uses the stored 3-decimal fg_pct; naive_fg_over_fga uses fg / fga on both sides. rounding_flips counts players who pass only with the stored column: their fg / fga is just below the average, but rounding to 3 decimals lifts the stored fg_pct above it.
 
 <details><summary>SQL</summary>
 
@@ -623,14 +657,16 @@ Naive_avg_fg_pct_no_threshold is the common shortcut, stored fg_pct > AVG(fg_pct
 WITH league AS (
     SELECT
         CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct,
-        AVG(fg_pct) AS avg_fg_pct
+        AVG(fg_pct) AS avg_fg_pct,
+        AVG(CAST(fg AS REAL) / NULLIF(fga, 0)) AS avg_fg_over_fga
     FROM player_season
 ),
 shooters AS (
     SELECT
         p.fga,
         CAST(p.fg AS REAL) / p.fga > l.fg_pct AS above,
-        p.fg_pct > l.avg_fg_pct AS above_naive
+        p.fg_pct > l.avg_fg_pct AS above_naive_stored,
+        CAST(p.fg AS REAL) / p.fga > l.avg_fg_over_fga AS above_naive_computed
     FROM player_season AS p
     CROSS JOIN league AS l
     WHERE p.fga > 0
@@ -641,7 +677,9 @@ SELECT
     SUM(above AND fga >= 200) AS min_200_fga,
     SUM(above AND fga >= 300) AS min_300_fga,
     SUM(fga >= 300) AS players_with_300_fga,
-    SUM(above_naive) AS naive_avg_fg_pct_no_threshold
+    SUM(above_naive_stored) AS naive_stored_fg_pct,
+    SUM(above_naive_computed) AS naive_fg_over_fga,
+    SUM(above_naive_stored AND NOT above_naive_computed) AS rounding_flips
 FROM shooters;
 ```
 
@@ -649,9 +687,9 @@ FROM shooters;
 
 Result (1 row). Full result: [results/v09.csv](results/v09.csv)
 
-| no_threshold | min_100_fga | min_200_fga | min_300_fga | players_with_300_fga | naive_avg_fg_pct_no_threshold |
-|---|---|---|---|---|---|
-| 241 | 179 | 148 | 120 | 284 | 273 |
+| no_threshold | min_100_fga | min_200_fga | min_300_fga | players_with_300_fga | naive_stored_fg_pct | naive_fg_over_fga | rounding_flips |
+|---|---|---|---|---|---|---|---|
+| 241 | 179 | 148 | 120 | 284 | 273 | 270 | 3 |
 
 ### V10. Q10 sensitivity: average 3P with and without zero-attempt players
 
@@ -715,7 +753,7 @@ Result (4 rows). Full result: [results/v11.csv](results/v11.csv)
 
 ### V12. Q6 ties: teams with more than one top scorer
 
-Expect no rows.
+One summary row, ok when the count is 0; any ties are listed by team.
 
 <details><summary>SQL</summary>
 
@@ -727,21 +765,33 @@ WITH ranked AS (
         RANK() OVER (PARTITION BY team ORDER BY pts DESC) AS pts_rank
     FROM player_stats
     WHERE team NOT GLOB '[0-9]*TM'
+),
+tied AS (
+    SELECT
+        team,
+        GROUP_CONCAT(player, ', ' ORDER BY player) AS players
+    FROM ranked
+    WHERE pts_rank = 1
+    GROUP BY team
+    HAVING COUNT(*) > 1
 )
 SELECT
-    team,
-    COUNT(*) AS tied_leaders,
-    GROUP_CONCAT(player, ', ' ORDER BY player) AS players,
-    'tie for top scorer' AS result
-FROM ranked
-WHERE pts_rank = 1
-GROUP BY team
-HAVING COUNT(*) > 1;
+    COUNT(*) AS teams_with_tied_leaders,
+    GROUP_CONCAT(team || ': ' || players, '; ' ORDER BY team) AS ties,
+    CASE
+        WHEN COUNT(*) = 0 THEN 'ok'
+        ELSE 'tie for top scorer'
+    END AS result
+FROM tied;
 ```
 
 </details>
 
-Result: 0 rows. Full result: [results/v12.csv](results/v12.csv)
+Result (1 row). Full result: [results/v12.csv](results/v12.csv)
+
+| teams_with_tied_leaders | ties | result |
+|---|---|---|
+| 0 |  | ok |
 
 ### V13. Q9 ties: players on the same team with equal points
 

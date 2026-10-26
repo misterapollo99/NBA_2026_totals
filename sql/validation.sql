@@ -49,16 +49,25 @@ SELECT
 FROM compared;
 
 -- V2. Multi-team players without a combined row
--- Note: player_season would return several rows for such a player. Expect no rows.
+-- Note: player_season would return several rows for such a player. One summary row, ok
+-- when the count is 0; any such players are listed by name.
+WITH missing AS (
+    SELECT
+        player_id,
+        player
+    FROM player_stats
+    GROUP BY player_id
+    HAVING COUNT(*) > 1
+        AND SUM(team GLOB '[0-9]*TM') = 0
+)
 SELECT
-    player_id,
-    player,
-    COUNT(*) AS team_rows,
-    'missing combined row' AS result
-FROM player_stats
-GROUP BY player_id
-HAVING COUNT(*) > 1
-    AND SUM(team GLOB '[0-9]*TM') = 0;
+    COUNT(*) AS players_without_combined_row,
+    GROUP_CONCAT(player, ', ' ORDER BY player) AS players,
+    CASE
+        WHEN COUNT(*) = 0 THEN 'ok'
+        ELSE 'missing combined row'
+    END AS result
+FROM missing;
 
 -- V3. League FG%: SUM(fg) / SUM(fga) vs the saved League Average row
 -- Note: avg_of_player_fg_pct is shown for contrast; it is not the league figure. The result
@@ -157,19 +166,24 @@ GROUP BY pos
 ORDER BY averaged_min_20_g DESC;
 
 -- V9. Q8 sensitivity: players above league FG% by minimum FGA
--- Note: naive_avg_fg_pct_no_threshold is the common shortcut, stored fg_pct > AVG(fg_pct)
--- with no threshold, which the Q8 note quotes for contrast.
+-- Note: the naive columns are the common shortcut, a player's FG% > the average of player
+-- FG%s with no threshold, which the Q8 note quotes for contrast. naive_stored_fg_pct uses the
+-- stored 3-decimal fg_pct; naive_fg_over_fga uses fg / fga on both sides. rounding_flips
+-- counts players who pass only with the stored column: their fg / fga is just below the
+-- average, but rounding to 3 decimals lifts the stored fg_pct above it.
 WITH league AS (
     SELECT
         CAST(SUM(fg) AS REAL) / SUM(fga) AS fg_pct,
-        AVG(fg_pct) AS avg_fg_pct
+        AVG(fg_pct) AS avg_fg_pct,
+        AVG(CAST(fg AS REAL) / NULLIF(fga, 0)) AS avg_fg_over_fga
     FROM player_season
 ),
 shooters AS (
     SELECT
         p.fga,
         CAST(p.fg AS REAL) / p.fga > l.fg_pct AS above,
-        p.fg_pct > l.avg_fg_pct AS above_naive
+        p.fg_pct > l.avg_fg_pct AS above_naive_stored,
+        CAST(p.fg AS REAL) / p.fga > l.avg_fg_over_fga AS above_naive_computed
     FROM player_season AS p
     CROSS JOIN league AS l
     WHERE p.fga > 0
@@ -180,7 +194,9 @@ SELECT
     SUM(above AND fga >= 200) AS min_200_fga,
     SUM(above AND fga >= 300) AS min_300_fga,
     SUM(fga >= 300) AS players_with_300_fga,
-    SUM(above_naive) AS naive_avg_fg_pct_no_threshold
+    SUM(above_naive_stored) AS naive_stored_fg_pct,
+    SUM(above_naive_computed) AS naive_fg_over_fga,
+    SUM(above_naive_stored AND NOT above_naive_computed) AS rounding_flips
 FROM shooters;
 
 -- V10. Q10 sensitivity: average 3P with and without zero-attempt players
@@ -215,7 +231,7 @@ WHERE ast_rank BETWEEN 4 AND 7
 ORDER BY ast_rank, player;
 
 -- V12. Q6 ties: teams with more than one top scorer
--- Note: expect no rows.
+-- Note: one summary row, ok when the count is 0; any ties are listed by team.
 WITH ranked AS (
     SELECT
         team,
@@ -223,16 +239,24 @@ WITH ranked AS (
         RANK() OVER (PARTITION BY team ORDER BY pts DESC) AS pts_rank
     FROM player_stats
     WHERE team NOT GLOB '[0-9]*TM'
+),
+tied AS (
+    SELECT
+        team,
+        GROUP_CONCAT(player, ', ' ORDER BY player) AS players
+    FROM ranked
+    WHERE pts_rank = 1
+    GROUP BY team
+    HAVING COUNT(*) > 1
 )
 SELECT
-    team,
-    COUNT(*) AS tied_leaders,
-    GROUP_CONCAT(player, ', ' ORDER BY player) AS players,
-    'tie for top scorer' AS result
-FROM ranked
-WHERE pts_rank = 1
-GROUP BY team
-HAVING COUNT(*) > 1;
+    COUNT(*) AS teams_with_tied_leaders,
+    GROUP_CONCAT(team || ': ' || players, '; ' ORDER BY team) AS ties,
+    CASE
+        WHEN COUNT(*) = 0 THEN 'ok'
+        ELSE 'tie for top scorer'
+    END AS result
+FROM tied;
 
 -- V13. Q9 ties: players on the same team with equal points
 -- Note: these players share a rank in Q9. Expected and handled by RANK(), so not a flag.

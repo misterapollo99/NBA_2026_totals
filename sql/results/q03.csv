@@ -1,6 +1,6 @@
-player,team,ast
-Nikola Jokić,DEN,697
-Cade Cunningham,DET,634
-Jalen Johnson,ATL,566
-James Harden,2TM,557
-Jamal Murray,DEN,535
+player,team,teams,ast
+Nikola Jokić,DEN,,697
+Cade Cunningham,DET,,634
+Jalen Johnson,ATL,,566
+James Harden,2TM,"CLE, LAC",557
+Jamal Murray,DEN,,535

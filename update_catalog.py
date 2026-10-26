@@ -21,11 +21,13 @@ Assumptions:
    0.00) is allowed. A catalog price that is not a non-negative number is also an error.
 8. Prices use Decimal with ROUND_HALF_UP and are always written with two decimals
    (19 becomes 19.00). A blank catalog price stays blank.
-9. updated_catalog.csv keeps the original columns in order: price is replaced in place and
-   product_detail is appended. color_list is left as the original input; normalized colors
-   are in product_detail.
-10. A product with no colors left gets an empty product_detail and is not counted in
-    colors_summary.csv, which counts distinct SKUs per final color, sorted by color.
+9. updated_catalog.csv keeps the original columns in order. color_list is replaced with the
+   final canonical colors; price is replaced in place and product_detail is appended. The
+   original input is in data/catalog.csv. color_list is joined with ", " ("Black, Gray"), in
+   the same order as product_detail.
+10. A product with no colors left gets an empty color_list and product_detail and is not
+    counted in colors_summary.csv, which counts distinct SKUs per final color, sorted by color.
+11. data/ and output/ are resolved relative to this file, so the script runs from any directory.
 """
 
 import json
@@ -36,8 +38,9 @@ from pathlib import Path
 
 import pandas as pd
 
-DATA = Path("data")
-OUTPUT = Path("output")
+ROOT = Path(__file__).resolve().parent
+DATA = ROOT / "data"
+OUTPUT = ROOT / "output"
 PREFIX = "Lily Attributes:Color:"
 CENTS = Decimal("0.01")
 # The % is required: a bare "5" could mean $5 or 5%, so it is rejected as ambiguous.
@@ -89,6 +92,10 @@ def build_product_detail(colors: list[str]) -> str:
     return ",".join(PREFIX + color for color in colors)
 
 
+def build_color_list(colors: list[str]) -> str:
+    return ", ".join(colors)
+
+
 def load_inputs() -> tuple[pd.DataFrame, pd.DataFrame, dict[str, str]]:
     catalog = pd.read_csv(DATA / "catalog.csv", dtype=str, keep_default_na=False)
     updates = pd.read_csv(DATA / "updates.tsv", sep="\t", dtype=str, keep_default_na=False)
@@ -133,6 +140,7 @@ def main() -> None:
             raise ValueError(f"id {row.id}: {err}") from err
 
     updated = catalog.copy()
+    updated["color_list"] = [build_color_list(colors) for colors in final_colors]
     updated["price"] = prices
     updated["product_detail"] = [build_product_detail(colors) for colors in final_colors]
 
@@ -151,7 +159,7 @@ def main() -> None:
     updated.to_csv(OUTPUT / "updated_catalog.csv", **csv_options)
     updated[["id", "product_detail"]].to_csv(OUTPUT / "product_detail_only.csv", **csv_options)
     summary.to_csv(OUTPUT / "colors_summary.csv", **csv_options)
-    print(f"wrote {len(updated)} products and {len(summary)} colors to {OUTPUT}/")
+    print(f"wrote {len(updated)} products and {len(summary)} colors to {OUTPUT}")
 
 
 if __name__ == "__main__":

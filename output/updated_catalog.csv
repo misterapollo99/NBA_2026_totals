@@ -1,11 +1,11 @@
 id,title,price,color_list,description,product_detail
-123,Men's Trail Runner,98.99,"black,  gray  , slate",Rugged shoe with breathable mesh.,"Lily Attributes:Color:Black,Lily Attributes:Color:Gray"
-A-7789,Women's Yoga Pant,56.53,"navy, blue",4-way stretch with hidden pocket.,Lily Attributes:Color:Blue
-B001,Classic Tee,19.00,"white, off white",Super-soft cotton tee.,Lily Attributes:Color:White
-SKU-5,Packable Jacket,103.20,"olive,  green",Water-resistant and packs into pocket.,Lily Attributes:Color:Green
-9Z9Z,Kids Socks (3-pack),12.99,"red, crimson",Cushioned heel and toe.,Lily Attributes:Color:Red
-ABC12,Everyday Tote,40.19,"sand, beige","Recycled fabric, magnetic closure.",Lily Attributes:Color:Beige
-X-0007,Baseball Cap,22.00,"charcoal, black",Adjustable back strap.,Lily Attributes:Color:Black
-FLEX9,Running Short,39.00,"navy,  midnight blue",Lightweight with brief liner.,Lily Attributes:Color:Blue
-LT-42,Logo Hoodie,65.00,"heather gray, gray",Brushed fleece interior.,Lily Attributes:Color:Gray
-BY-88,Travel Mug,25.92,"stainless, silver",Double-wall insulation.,Lily Attributes:Color:Silver
+123,Men's Trail Runner,98.99,"Black, Gray",Rugged shoe with breathable mesh.,"Lily Attributes:Color:Black,Lily Attributes:Color:Gray"
+A-7789,Women's Yoga Pant,56.53,Blue,4-way stretch with hidden pocket.,Lily Attributes:Color:Blue
+B001,Classic Tee,19.00,White,Super-soft cotton tee.,Lily Attributes:Color:White
+SKU-5,Packable Jacket,103.20,Green,Water-resistant and packs into pocket.,Lily Attributes:Color:Green
+9Z9Z,Kids Socks (3-pack),12.99,Red,Cushioned heel and toe.,Lily Attributes:Color:Red
+ABC12,Everyday Tote,40.19,Beige,"Recycled fabric, magnetic closure.",Lily Attributes:Color:Beige
+X-0007,Baseball Cap,22.00,Black,Adjustable back strap.,Lily Attributes:Color:Black
+FLEX9,Running Short,39.00,Blue,Lightweight with brief liner.,Lily Attributes:Color:Blue
+LT-42,Logo Hoodie,65.00,Gray,Brushed fleece interior.,Lily Attributes:Color:Gray
+BY-88,Travel Mug,25.92,Silver,Double-wall insulation.,Lily Attributes:Color:Silver
