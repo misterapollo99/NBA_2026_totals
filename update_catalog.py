@@ -20,8 +20,8 @@ Assumptions:
 8. Prices use Decimal with ROUND_HALF_UP and are always written with two decimals
    (19 becomes 19.00). A blank catalog price stays blank.
 9. updated_catalog.csv keeps the original columns in order: price is replaced in place and
-   product_detail is appended. color_list keeps its original raw value on purpose, as the
-   source record; the normalized colors live in product_detail.
+   product_detail is appended. color_list is left as the original input; normalized colors
+   are in product_detail.
 10. A product with no colors left gets an empty product_detail and is not counted in
     colors_summary.csv, which counts distinct SKUs per final color, sorted by color.
 """
